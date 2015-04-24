@@ -47,6 +47,11 @@ ConfigPluginsWidget::~ConfigPluginsWidget()
     delete ui;
 }
 
+void ConfigPluginsWidget::reset()
+{
+
+}
+
 void ConfigPluginsWidget::showAddPluginDialog()
 {
     static AddPluginDialog *addPluginDialog = new AddPluginDialog(this);

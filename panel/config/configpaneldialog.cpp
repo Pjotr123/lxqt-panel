@@ -37,13 +37,17 @@ ConfigPanelDialog::ConfigPanelDialog(LxQtPanel *panel, QWidget *parent):
 
     mPanelPage = new ConfigPanelWidget(panel, this);
     addPage(mPanelPage, tr("Configure Panel"), QStringLiteral("configure"));
-    connect(this, SIGNAL(reset()), mPanelPage, SLOT(reset()));
-    connect(this, SIGNAL(accepted()), panel, SLOT(saveSettings()));
+    connect(this, &ConfigPanelDialog::reset, mPanelPage, &ConfigPanelWidget::reset);
+    connect(this, &ConfigPanelDialog::accepted, [panel] {
+         panel->saveSettings();
+    });
 
     mPluginsPage = new ConfigPluginsWidget(panel, this);
     addPage(mPluginsPage, tr("Manage Widgets"), QStringLiteral("preferences-plugin"));
-    connect(this, SIGNAL(reset()), mPluginsPage, SLOT(reset()));
-    connect(this, SIGNAL(accepted()), panel, SLOT(saveSettings()));
+    connect(this, &ConfigPanelDialog::reset, mPluginsPage, &ConfigPluginsWidget::reset);
+    connect(this, &ConfigPanelDialog::accepted, [panel] {
+        panel->saveSettings();
+   });
 }
 
 void ConfigPanelDialog::showConfigPanelPage()

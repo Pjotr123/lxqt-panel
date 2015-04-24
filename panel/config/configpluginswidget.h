@@ -44,6 +44,12 @@ public:
     ConfigPluginsWidget(LxQtPanel *panel, QWidget* parent = 0);
     ~ConfigPluginsWidget();
 
+signals:
+    void changed();
+
+public slots:
+    void reset();
+
 private slots:
     void showAddPluginDialog();
 
