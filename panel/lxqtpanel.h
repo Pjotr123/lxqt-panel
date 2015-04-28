@@ -39,6 +39,7 @@
 
 class QMenu;
 class Plugin;
+class QAbstractItemModel;
 
 namespace LxQt {
 class Settings;
@@ -46,6 +47,7 @@ class PluginInfo;
 }
 class LxQtPanelLayout;
 class ConfigPanelDialog;
+class PanelPlugins;
 
 /*! \brief The LxQtPanel class provides a single lxqt-panel.
  */
@@ -102,6 +104,8 @@ public:
 
     LxQt::Settings *settings() const { return mSettings; }
 
+    QAbstractItemModel * pluginsModel();
+
 public slots:
     void show();
     void showPanel();
@@ -150,15 +154,13 @@ private:
     LxQt::Settings *mSettings;
     QFrame *LxQtPanelWidget;
     QString mConfigGroup;
-    QList<Plugin*> mPlugins;
-    QList<QString> mPluginsList;
+    QScopedPointer<PanelPlugins> mPlugins;
 
     int findAvailableScreen(LxQtPanel::Position position);
     void updateWmStrut();
 
     void loadPlugins();
     Plugin *loadPlugin(const LxQt::PluginInfo &desktopFile, const QString &settingsGroup);
-    Plugin *findPlugin(const ILxQtPanelPlugin *iPlugin) const;
 
     QString findNewPluginSettingsGroup(const QString &pluginType) const;
 

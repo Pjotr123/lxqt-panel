@@ -34,6 +34,7 @@
 #include "config/configpaneldialog.h"
 #include "popupmenu.h"
 #include "plugin.h"
+#include "panelplugins.h"
 #include <LXQt/Settings>
 #include <LXQt/PluginInfo>
 
@@ -114,6 +115,7 @@ QString LxQtPanel::positionToStr(ILxQtPanel::Position position)
 LxQtPanel::LxQtPanel(const QString &configGroup, QWidget *parent) :
     QFrame(parent),
     mConfigGroup(configGroup),
+    mPlugins(new PanelPlugins),
     mPanelSize(0),
     mIconSize(0),
     mLineCount(0),
@@ -241,7 +243,8 @@ void LxQtPanel::saveSettings(bool later)
 
     mSettings->beginGroup(mConfigGroup);
 
-    mSettings->setValue(CFG_KEY_PLUGINS, (mPluginsList.isEmpty() ? "" : QVariant(mPluginsList)));
+    const QList<QString>& plugins = mPlugins->pluginNames();
+    mSettings->setValue(CFG_KEY_PLUGINS, (plugins.isEmpty()) ? QString() : QVariant{plugins});
 
     mSettings->setValue(CFG_KEY_PANELSIZE, mPanelSize);
     mSettings->setValue(CFG_KEY_ICONSIZE, mIconSize);
@@ -286,7 +289,6 @@ LxQtPanel::~LxQtPanel()
 {
     mLayout->setEnabled(false);
     // do not save settings because of "user deleted panel" functionality saveSettings();
-    qDeleteAll(mPlugins);
 }
 
 
@@ -320,7 +322,7 @@ void LxQtPanel::loadPlugins()
 {
     QStringList desktopDirs = pluginDesktopDirs();
     mSettings->beginGroup(mConfigGroup);
-    mPluginsList = mSettings->value(CFG_KEY_PLUGINS).toStringList();
+    mPlugins->setPluginNames(mSettings->value(CFG_KEY_PLUGINS).toStringList());
     mSettings->endGroup();
 
 #ifdef DEBUG_PLUGIN_LOADTIME
@@ -328,7 +330,7 @@ void LxQtPanel::loadPlugins()
     timer.start();
     qint64 lastTime = 0;
 #endif
-    foreach (QString sect, mPluginsList)
+    for (auto const & sect : mPlugins->pluginNames())
     {
         QString type = mSettings->value(sect+"/type").toString();
         if (type.isEmpty())
@@ -358,19 +360,19 @@ void LxQtPanel::loadPlugins()
  ************************************************/
 Plugin *LxQtPanel::loadPlugin(const LxQt::PluginInfo &desktopFile, const QString &settingsGroup)
 {
-    Plugin *plugin = new Plugin(desktopFile, mSettings->fileName(), settingsGroup, this);
+    std::unique_ptr<Plugin> plugin{new Plugin{desktopFile, mSettings->fileName(), settingsGroup, this}};
     if (plugin->isLoaded())
     {
-        mPlugins.append(plugin);
-        connect(plugin, SIGNAL(startMove()), mLayout, SLOT(startMovePlugin()));
-        connect(plugin, SIGNAL(remove()), this, SLOT(removePlugin()));
-        connect(this, SIGNAL(realigned()), plugin, SLOT(realign()));
-        mLayout->addWidget(plugin);
-        return plugin;
+        //TODO: move loading plugins into model!?!
+        Plugin * plug = mPlugins->addPlugin(std::move(plugin));
+        connect(plug, SIGNAL(startMove()), mLayout, SLOT(startMovePlugin()));
+        connect(plug, SIGNAL(remove()), this, SLOT(removePlugin()));
+        connect(this, SIGNAL(realigned()), plug, SLOT(realign()));
+        mLayout->addWidget(plug);
+        return plug;
     }
 
-    delete plugin;
-    return 0;
+    return nullptr;
 }
 
 
@@ -646,9 +648,9 @@ void LxQtPanel::addPlugin(const LxQt::PluginInfo &desktopFile)
 {
     QString settingsGroup = findNewPluginSettingsGroup(desktopFile.id());
     Plugin * plugin = loadPlugin(desktopFile, settingsGroup);
-    if (0 != plugin)
+    if (nullptr != plugin)
     {
-        mPluginsList << settingsGroup;
+        mPlugins->addPluginName(settingsGroup);
 
         realign();
         emit pluginAdded(LxQt::PluginData(plugin->desktopFile().id(), plugin, plugin->popupMenu()));
@@ -1010,25 +1012,10 @@ void LxQtPanel::showPopupMenu(Plugin *plugin)
 /************************************************
 
  ************************************************/
-Plugin *LxQtPanel::findPlugin(const ILxQtPanelPlugin *iPlugin) const
-{
-    foreach(Plugin *plugin, mPlugins)
-    {
-        if (plugin->iPlugin() == iPlugin)
-            return plugin;
-    }
-
-    return 0;
-}
-
-
-/************************************************
-
- ************************************************/
 QRect LxQtPanel::calculatePopupWindowPos(const ILxQtPanelPlugin *plugin, const QSize &windowSize) const
 {
-    Plugin *panelPlugin = findPlugin(plugin);
-    if (!plugin)
+    Plugin const * panel_plugin = dynamic_cast<Plugin const *>(plugin);
+    if (nullptr == panel_plugin)
         return QRect();
 
     int x=0, y=0;
@@ -1036,23 +1023,23 @@ QRect LxQtPanel::calculatePopupWindowPos(const ILxQtPanelPlugin *plugin, const Q
     switch (position())
     {
     case ILxQtPanel::PositionTop:
-        x = panelPlugin->mapToGlobal(QPoint(0, 0)).x();
+        x = panel_plugin->mapToGlobal(QPoint(0, 0)).x();
         y = globalGometry().bottom();
         break;
 
     case ILxQtPanel::PositionBottom:
-        x = panelPlugin->mapToGlobal(QPoint(0, 0)).x();
+        x = panel_plugin->mapToGlobal(QPoint(0, 0)).x();
         y = globalGometry().top() - windowSize.height();
         break;
 
     case ILxQtPanel::PositionLeft:
         x = globalGometry().right();
-        y = panelPlugin->mapToGlobal(QPoint(0, 0)).y();
+        y = panel_plugin->mapToGlobal(QPoint(0, 0)).y();
         break;
 
     case ILxQtPanel::PositionRight:
         x = globalGometry().left() - windowSize.width();
-        y = panelPlugin->mapToGlobal(QPoint(0, 0)).y();
+        y = panel_plugin->mapToGlobal(QPoint(0, 0)).y();
         break;
     }
 
@@ -1109,15 +1096,14 @@ QString LxQtPanel::findNewPluginSettingsGroup(const QString &pluginType) const
 void LxQtPanel::removePlugin()
 {
     Plugin *plugin = qobject_cast<Plugin*>(sender());
-    if (plugin)
+    if (nullptr != plugin)
     {
         mSettings->remove(plugin->settingsGroup());
-        mPluginsList.removeAll(plugin->settingsGroup());
-        mPlugins.removeAll(plugin);
+        emit pluginRemoved(LxQt::PluginData(plugin->desktopFile().id(), plugin, nullptr/*don't want any menu*/));
+        mPlugins->removePlugin(plugin);
     }
 
     saveSettings();
-    emit pluginRemoved(LxQt::PluginData(plugin->desktopFile().id(), plugin, nullptr/*don't want any menu*/));
 }
 
 
@@ -1138,9 +1124,7 @@ void LxQtPanel::pluginMoved(Plugin const * plug)
             last_name = plugin->settingsGroup();
         }
     }
-    //merge list of plugins (try to preserve original position)
-    mPluginsList.removeAll(plug->settingsGroup());
-    mPluginsList.insert(mPluginsList.indexOf(plug_is_after)/*-1 if not found*/ + 1, plug->settingsGroup());
+    mPlugins->movePlugin(plug, plug_is_after);
     saveSettings();
 }
 
@@ -1199,4 +1183,9 @@ void LxQtPanel::setHidable(bool hidable, bool save)
         saveSettings(true);
 
     realign();
+}
+
+QAbstractItemModel * LxQtPanel::pluginsModel()
+{
+    return mPlugins.data();
 }

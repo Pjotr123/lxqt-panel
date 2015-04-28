@@ -28,6 +28,7 @@
 #include "configpluginswidget.h"
 #include "ui_configpluginswidget.h"
 #include "addplugindialog.h"
+#include <HtmlDelegate>
 
 #include <QPushButton>
 
@@ -37,6 +38,11 @@ ConfigPluginsWidget::ConfigPluginsWidget(LxQtPanel *panel, QWidget* parent) :
     mPanel(panel)
 {
     ui->setupUi(this);
+
+    QScopedPointer<QItemSelectionModel> m{ui->listView_plugins->selectionModel()};
+    ui->listView_plugins->setModel(panel->pluginsModel());
+    QScopedPointer<QAbstractItemDelegate> d{ui->listView_plugins->itemDelegate()};
+    ui->listView_plugins->setItemDelegate(new LxQt::HtmlDelegate(QSize(32, 32), ui->listView_plugins));
 
     connect(ui->pushButton_addPlugin, &QPushButton::clicked,
             this, &ConfigPluginsWidget::showAddPluginDialog);
