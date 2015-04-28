@@ -4,36 +4,55 @@
 #include <QAbstractListModel>
 #include <memory>
 
+namespace LxQt
+{
+    class PluginInfo;
+    struct PluginData;
+}
+
+class LxQtPanel;
 class Plugin;
 
 class PanelPlugins : public QAbstractListModel
 {
     Q_OBJECT
 public:
-    using QAbstractListModel::QAbstractListModel;
+    PanelPlugins(LxQtPanel * panel
+            , QString const & namesKey
+            , QStringList const & desktopDirs
+            , QObject * parent = nullptr);
     ~PanelPlugins();
 
     virtual int rowCount(const QModelIndex & parent = QModelIndex()) const override;
     virtual QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const override;
     virtual Qt::ItemFlags flags(const QModelIndex & index) const override;
 
-    QStringList const & pluginNames() const;
-    void setPluginNames(QStringList && names);
+    QStringList pluginNames() const;
+    QList<Plugin *> plugins() const;
 
-    //TODO: B move loading plugins into model!?!
-    Plugin * addPlugin(std::unique_ptr<Plugin> plugin);
-    void addPluginName(QString const & name);
-    //TODO: E move loading plugins into model!?!
-    void removePlugin(Plugin * plugin);
     /*!
      * \param plugin plugin that has been moved
-     * \param nameBefore name of plugin that is right before of moved plugin
+     * \param nameAfter name of plugin that is right after moved plugin
      */
-    void movePlugin(Plugin const * plugin, QString const & nameBefore);
+    void movePlugin(Plugin const * plugin, QString const & nameAfter);
+
+signals:
+    void pluginAdded(LxQt::PluginData const & plugin);
+    void pluginRemoved(LxQt::PluginData const & plugin);
+
+public slots:
+    void addPlugin(const LxQt::PluginInfo &desktopFile);
+    void removePlugin();
 
 private:
-    QList<Plugin*> mPlugins;
-    QStringList mConfigOrder;
+    void loadPlugins(QString const & namesKey, QStringList const & desktopDirs);
+    QPointer<Plugin> loadPlugin(LxQt::PluginInfo const & desktopFile, QString const & settingsGroup);
+    QString findNewPluginSettingsGroup(const QString &pluginType) const;
+
+private:
+    typedef QList<QPair <QString/*name*/, QPointer<Plugin> > > container_t;
+    container_t mPlugins;
+    LxQtPanel * mPanel;
 };
 
 #endif //panel_panelplugins_h

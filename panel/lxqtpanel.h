@@ -132,9 +132,6 @@ signals:
     void realigned();
     void deletedByUser(LxQtPanel *self);
 
-    void pluginAdded(LxQt::PluginData const & plugin);
-    void pluginRemoved(LxQt::PluginData const & plugin);
-
 protected:
     bool event(QEvent *event);
     void showEvent(QShowEvent *event);
@@ -142,10 +139,8 @@ protected:
 public slots:
     void showConfigDialog();
 private slots:
-    void addPlugin(const LxQt::PluginInfo &desktopFile);
     void showAddPluginDialog();
     void realign();
-    void removePlugin();
     void pluginMoved(Plugin const * plug);
     void userRequestForDeletion();
 
@@ -160,7 +155,6 @@ private:
     void updateWmStrut();
 
     void loadPlugins();
-    Plugin *loadPlugin(const LxQt::PluginInfo &desktopFile, const QString &settingsGroup);
 
     QString findNewPluginSettingsGroup(const QString &pluginType) const;
 

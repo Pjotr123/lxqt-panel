@@ -115,7 +115,7 @@ QString LxQtPanel::positionToStr(ILxQtPanel::Position position)
 LxQtPanel::LxQtPanel(const QString &configGroup, QWidget *parent) :
     QFrame(parent),
     mConfigGroup(configGroup),
-    mPlugins(new PanelPlugins),
+    mPlugins{nullptr},
     mPanelSize(0),
     mIconSize(0),
     mLineCount(0),
@@ -243,8 +243,7 @@ void LxQtPanel::saveSettings(bool later)
 
     mSettings->beginGroup(mConfigGroup);
 
-    const QList<QString>& plugins = mPlugins->pluginNames();
-    mSettings->setValue(CFG_KEY_PLUGINS, (plugins.isEmpty()) ? QString() : QVariant{plugins});
+    mSettings->setValue(CFG_KEY_PLUGINS, mPlugins->pluginNames());
 
     mSettings->setValue(CFG_KEY_PANELSIZE, mPanelSize);
     mSettings->setValue(CFG_KEY_ICONSIZE, mIconSize);
@@ -320,59 +319,20 @@ QStringList pluginDesktopDirs()
  ************************************************/
 void LxQtPanel::loadPlugins()
 {
-    QStringList desktopDirs = pluginDesktopDirs();
-    mSettings->beginGroup(mConfigGroup);
-    mPlugins->setPluginNames(mSettings->value(CFG_KEY_PLUGINS).toStringList());
-    mSettings->endGroup();
+    QString names_key{mConfigGroup};
+    names_key += '/';
+    names_key += QLatin1String(CFG_KEY_PLUGINS);
+    mPlugins.reset(new PanelPlugins{this, names_key, pluginDesktopDirs()});
 
-#ifdef DEBUG_PLUGIN_LOADTIME
-    QElapsedTimer timer;
-    timer.start();
-    qint64 lastTime = 0;
-#endif
-    for (auto const & sect : mPlugins->pluginNames())
+    connect(mPlugins.data(), &PanelPlugins::pluginAdded, [this] { saveSettings(true); });
+    connect(mPlugins.data(), &PanelPlugins::pluginRemoved, [this] { saveSettings(); });
+
+    for (auto const & plugin : mPlugins->plugins())
     {
-        QString type = mSettings->value(sect+"/type").toString();
-        if (type.isEmpty())
-        {
-            qWarning() << QString("Section \"%1\" not found in %2.").arg(sect, mSettings->fileName());
-            continue;
-        }
-
-        LxQt::PluginInfoList list = LxQt::PluginInfo::search(desktopDirs, "LxQtPanel/Plugin", QString("%1.desktop").arg(type));
-        if( !list.count())
-        {
-            qWarning() << QString("Plugin \"%1\" not found.").arg(type);
-            continue;
-        }
-
-        loadPlugin(list.first(), sect);
-#ifdef DEBUG_PLUGIN_LOADTIME
-        qDebug() << "load plugin" << type << "takes" << (timer.elapsed() - lastTime) << "ms";
-        lastTime = timer.elapsed();
-#endif
+        connect(plugin, SIGNAL(startMove()), mLayout, SLOT(startMovePlugin()));
+        connect(this, SIGNAL(realigned()), plugin, SLOT(realign()));
+        mLayout->addWidget(plugin);
     }
-}
-
-
-/************************************************
-
- ************************************************/
-Plugin *LxQtPanel::loadPlugin(const LxQt::PluginInfo &desktopFile, const QString &settingsGroup)
-{
-    std::unique_ptr<Plugin> plugin{new Plugin{desktopFile, mSettings->fileName(), settingsGroup, this}};
-    if (plugin->isLoaded())
-    {
-        //TODO: move loading plugins into model!?!
-        Plugin * plug = mPlugins->addPlugin(std::move(plugin));
-        connect(plug, SIGNAL(startMove()), mLayout, SLOT(startMovePlugin()));
-        connect(plug, SIGNAL(remove()), this, SLOT(removePlugin()));
-        connect(this, SIGNAL(realigned()), plug, SLOT(realign()));
-        mLayout->addWidget(plug);
-        return plug;
-    }
-
-    return nullptr;
 }
 
 
@@ -638,24 +598,6 @@ void LxQtPanel::showAddPluginDialog()
 
     KWindowSystem::activateWindow(wid);
     KWindowSystem::setOnDesktop(wid, KWindowSystem::currentDesktop());
-}
-
-
-/************************************************
-
- ************************************************/
-void LxQtPanel::addPlugin(const LxQt::PluginInfo &desktopFile)
-{
-    QString settingsGroup = findNewPluginSettingsGroup(desktopFile.id());
-    Plugin * plugin = loadPlugin(desktopFile, settingsGroup);
-    if (nullptr != plugin)
-    {
-        mPlugins->addPluginName(settingsGroup);
-
-        realign();
-        emit pluginAdded(LxQt::PluginData(plugin->desktopFile().id(), plugin, plugin->popupMenu()));
-    }
-    saveSettings(true);
 }
 
 
@@ -1074,57 +1016,29 @@ QString LxQtPanel::qssPosition() const
     return positionToStr(position());
 }
 
-
-/************************************************
-
- ************************************************/
-QString LxQtPanel::findNewPluginSettingsGroup(const QString &pluginType) const
-{
-    QStringList groups = mSettings->childGroups();
-    groups.sort();
-
-    // Generate new section name
-    for (int i = 2; true; ++i)
-        if (!groups.contains(QString("%1%2").arg(pluginType).arg(i)))
-            return QString("%1%2").arg(pluginType).arg(i);
-}
-
-
-/************************************************
-
- ************************************************/
-void LxQtPanel::removePlugin()
-{
-    Plugin *plugin = qobject_cast<Plugin*>(sender());
-    if (nullptr != plugin)
-    {
-        mSettings->remove(plugin->settingsGroup());
-        emit pluginRemoved(LxQt::PluginData(plugin->desktopFile().id(), plugin, nullptr/*don't want any menu*/));
-        mPlugins->removePlugin(plugin);
-    }
-
-    saveSettings();
-}
-
-
 /************************************************
 
  ************************************************/
 void LxQtPanel::pluginMoved(Plugin const * plug)
 {
     //get new position of the moved plugin
-    QString plug_is_after, last_name;
+    bool found{false};
+    QString plug_is_before;
     for (int i=0; i<mLayout->count(); ++i)
     {
         Plugin *plugin = qobject_cast<Plugin*>(mLayout->itemAt(i)->widget());
         if (plugin)
         {
-            if (plug == plugin)
-                plug_is_after = last_name; //is after previous name (or empty as first)
-            last_name = plugin->settingsGroup();
+            if (found)
+            {
+                //we found our plugin in previous cycle -> is before this (or empty as last)
+                plug_is_before = plugin->settingsGroup();
+                break;
+            } else
+                found = (plug == plugin);
         }
     }
-    mPlugins->movePlugin(plug, plug_is_after);
+    mPlugins->movePlugin(plug, plug_is_before);
     saveSettings();
 }
 
