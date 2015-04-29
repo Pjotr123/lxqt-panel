@@ -61,10 +61,7 @@ QVariant PanelPlugins::data(const QModelIndex & index, int role/* = Qt::DisplayR
 
 Qt::ItemFlags PanelPlugins::flags(const QModelIndex & index) const
 {
-    Qt::ItemFlags f = Qt::ItemIsSelectable | Qt::ItemNeverHasChildren;
-    if (index.row() < mPlugins.size() && !mPlugins[index.row()].second.isNull())
-        f |= Qt::ItemIsEnabled;
-    return f;
+    return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemNeverHasChildren;
 }
 
 QStringList PanelPlugins::pluginNames() const
@@ -97,20 +94,29 @@ void PanelPlugins::addPlugin(const LxQt::PluginInfo &desktopFile)
     }
 }
 
-void PanelPlugins::removePlugin()
+void PanelPlugins::removePlugin(container_t::iterator plugin)
 {
-    Plugin * p = qobject_cast<Plugin*>(sender());
-    auto plugin = std::find_if(mPlugins.begin(), mPlugins.end(), [p] (container_t::const_reference obj) { return p == obj.second; });
     if (mPlugins.end() != plugin)
     {
+        Plugin * p = plugin->second.data();
         const int row = plugin - mPlugins.begin();
         beginRemoveRows(QModelIndex(), row, row);
         mPlugins.erase(plugin);
         endRemoveRows();
         mActive = mPlugins.isEmpty() ? QModelIndex() : createIndex(mPlugins.size() > row ? row : row - 1, 0);
-        emit pluginRemoved(plugin->second.data());
-        p->deleteLater();
+        if (nullptr != p)
+        {
+            emit pluginRemoved(p);
+            p->deleteLater();
+        }
     }
+}
+
+void PanelPlugins::removePlugin()
+{
+    Plugin * p = qobject_cast<Plugin*>(sender());
+    auto plugin = std::find_if(mPlugins.begin(), mPlugins.end(), [p] (container_t::const_reference obj) { return p == obj.second; });
+    removePlugin(std::move(plugin));
 }
 
 void PanelPlugins::movePlugin(Plugin const * plugin, QString const & nameAfter)
@@ -179,7 +185,7 @@ QPointer<Plugin> PanelPlugins::loadPlugin(LxQt::PluginInfo const & desktopFile, 
     std::unique_ptr<Plugin> plugin{new Plugin{desktopFile, mPanel->settings()->fileName(), settingsGroup, mPanel}};
     if (plugin->isLoaded())
     {
-        connect(plugin.get(), &Plugin::remove, this, &PanelPlugins::removePlugin);
+        connect(plugin.get(), &Plugin::remove, this, static_cast<void (PanelPlugins::*)()>(&PanelPlugins::removePlugin));
         return plugin.release();
     }
 
@@ -263,7 +269,9 @@ void PanelPlugins::onRemovePlugin()
     if (!isActiveIndexValid())
         return;
 
-    Plugin * const plugin = mPlugins[mActive.row()].second.data();
-    if (nullptr != plugin)
-        plugin->requestRemove();
+    auto plugin = mPlugins.begin() + mActive.row();
+    if (plugin->second.isNull())
+        removePlugin(std::move(plugin));
+    else
+        plugin->second->requestRemove();
 }

@@ -40,11 +40,16 @@ ConfigPluginsWidget::ConfigPluginsWidget(LxQtPanel *panel, QWidget* parent) :
 {
     ui->setupUi(this);
 
-    QScopedPointer<QItemSelectionModel> m{ui->listView_plugins->selectionModel()};
     PanelPlugins * plugins = mPanel->pluginsModel();
-    ui->listView_plugins->setModel(plugins);
-    QScopedPointer<QAbstractItemDelegate> d{ui->listView_plugins->itemDelegate()};
-    ui->listView_plugins->setItemDelegate(new LxQt::HtmlDelegate(QSize(32, 32), ui->listView_plugins));
+    {
+        QScopedPointer<QItemSelectionModel> m{ui->listView_plugins->selectionModel()};
+        ui->listView_plugins->setModel(plugins);
+    }
+    {
+        QScopedPointer<QAbstractItemDelegate> d{ui->listView_plugins->itemDelegate()};
+        ui->listView_plugins->setItemDelegate(new LxQt::HtmlDelegate(QSize(32, 32), ui->listView_plugins));
+    }
+
     connect(ui->listView_plugins, &QListView::activated, plugins, &PanelPlugins::onActivatedIndex);
 
     connect(ui->pushButton_moveUp, &QToolButton::clicked, plugins, &PanelPlugins::onMovePluginUp);

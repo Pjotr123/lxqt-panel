@@ -56,13 +56,16 @@ public slots:
     void onRemovePlugin();
 
 private:
+    typedef QList<QPair <QString/*name*/, QPointer<Plugin> > > container_t;
+
+private:
     void loadPlugins(QString const & namesKey, QStringList const & desktopDirs);
     QPointer<Plugin> loadPlugin(LxQt::PluginInfo const & desktopFile, QString const & settingsGroup);
     QString findNewPluginSettingsGroup(const QString &pluginType) const;
     bool isActiveIndexValid() const;
+    void removePlugin(container_t::iterator plugin);
 
 private:
-    typedef QList<QPair <QString/*name*/, QPointer<Plugin> > > container_t;
     container_t mPlugins;
     LxQtPanel * mPanel;
     QPersistentModelIndex mActive;
