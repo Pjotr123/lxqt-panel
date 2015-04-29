@@ -98,17 +98,16 @@ void PanelPlugins::removePlugin(container_t::iterator plugin)
 {
     if (mPlugins.end() != plugin)
     {
+        mPanel->settings()->remove(plugin->first);
         Plugin * p = plugin->second.data();
         const int row = plugin - mPlugins.begin();
         beginRemoveRows(QModelIndex(), row, row);
         mPlugins.erase(plugin);
         endRemoveRows();
         mActive = mPlugins.isEmpty() ? QModelIndex() : createIndex(mPlugins.size() > row ? row : row - 1, 0);
+        emit pluginRemoved(p); //p can be nullptr
         if (nullptr != p)
-        {
-            emit pluginRemoved(p);
             p->deleteLater();
-        }
     }
 }
 
