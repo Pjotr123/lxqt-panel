@@ -122,26 +122,18 @@ void PanelPlugins::removePlugin()
 void PanelPlugins::movePlugin(Plugin const * plugin, QString const & nameAfter)
 {
     //merge list of plugins (try to preserve original position)
-    auto moved = std::find_if(mPlugins.begin(), mPlugins.end(), [plugin] (container_t::const_reference obj) { return plugin == obj.second.data(); });
-    auto new_pos = std::find_if(mPlugins.begin(), mPlugins.end(), [nameAfter] (container_t::const_reference obj) { return nameAfter == obj.first; });
+    const int from =
+        std::find_if(mPlugins.begin(), mPlugins.end(), [plugin] (container_t::const_reference obj) { return plugin == obj.second.data(); })
+        - mPlugins.begin();
+    const int to =
+        std::find_if(mPlugins.begin(), mPlugins.end(), [nameAfter] (container_t::const_reference obj) { return nameAfter == obj.first; })
+        - mPlugins.begin();
+    const int to_plugins = from < to ? to - 1 : to;
 
-    const int from = moved - mPlugins.begin();
-    const int to = new_pos == mPlugins.end() ? mPlugins.size() - 1 : new_pos - mPlugins.begin();
-    int higher, lower;
-    if (to > from)
+    if (from != to)
     {
-        higher = to;
-        lower = from;
-    } else
-    {
-        higher = from;
-        lower = to;
-    }
-
-    if (higher != lower)
-    {
-        beginMoveRows(QModelIndex(), higher, higher, QModelIndex(), lower);
-        mPlugins.swap(higher, lower);
+        beginMoveRows(QModelIndex(), from, from, QModelIndex(), to);
+        mPlugins.move(from, to_plugins);
         endMoveRows();
     }
 }
