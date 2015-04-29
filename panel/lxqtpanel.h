@@ -104,7 +104,7 @@ public:
 
     LxQt::Settings *settings() const { return mSettings; }
 
-    QAbstractItemModel * pluginsModel();
+    PanelPlugins * pluginsModel();
 
 public slots:
     void show();
@@ -141,7 +141,9 @@ public slots:
 private slots:
     void showAddPluginDialog();
     void realign();
+    void pluginAdded(Plugin * plugin, bool saveSetting);
     void pluginMoved(Plugin const * plug);
+    void pluginMovedUp(Plugin * plugin);
     void userRequestForDeletion();
 
 private:

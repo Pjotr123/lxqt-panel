@@ -324,17 +324,34 @@ void LxQtPanel::loadPlugins()
     names_key += QLatin1String(CFG_KEY_PLUGINS);
     mPlugins.reset(new PanelPlugins{this, names_key, pluginDesktopDirs()});
 
-    connect(mPlugins.data(), &PanelPlugins::pluginAdded, [this] { saveSettings(true); });
+    connect(mPlugins.data(), &PanelPlugins::pluginAdded, [this] (Plugin * p) { pluginAdded(p, true); });
     connect(mPlugins.data(), &PanelPlugins::pluginRemoved, [this] { saveSettings(); });
+    connect(mPlugins.data(), &PanelPlugins::pluginMovedUp, this, &LxQtPanel::pluginMovedUp);
 
     for (auto const & plugin : mPlugins->plugins())
     {
-        connect(plugin, SIGNAL(startMove()), mLayout, SLOT(startMovePlugin()));
-        connect(this, SIGNAL(realigned()), plugin, SLOT(realign()));
-        mLayout->addWidget(plugin);
+        pluginAdded(plugin, false);
     }
 }
 
+/************************************************
+
+ ************************************************/
+void LxQtPanel::pluginAdded(Plugin * plugin, bool saveSetting)
+{
+    connect(plugin, &Plugin::startMove, mLayout, &LxQtPanelLayout::startMovePlugin);
+    connect(this, &LxQtPanel::realigned, plugin, &Plugin::realign);
+    const int prev_count = mLayout->count();
+    mLayout->addWidget(plugin);
+    //check actual position
+    const int pos = mLayout->indexOf(plugin);
+    if (prev_count > pos)
+    {
+        mLayout->moveItem(prev_count, pos, false);
+    }
+    if (saveSetting)
+        saveSettings(true);
+}
 
 /************************************************
 
@@ -1046,6 +1063,16 @@ void LxQtPanel::pluginMoved(Plugin const * plug)
 /************************************************
 
  ************************************************/
+void LxQtPanel::pluginMovedUp(Plugin * plugin)
+{
+    const int i = mLayout->indexOf(plugin);
+    if (0 < i)
+        mLayout->moveItem(i, i - 1, true);
+}
+
+/************************************************
+
+ ************************************************/
 void LxQtPanel::userRequestForDeletion()
 {
     mSettings->beginGroup(mConfigGroup);
@@ -1099,7 +1126,7 @@ void LxQtPanel::setHidable(bool hidable, bool save)
     realign();
 }
 
-QAbstractItemModel * LxQtPanel::pluginsModel()
+PanelPlugins * LxQtPanel::pluginsModel()
 {
     return mPlugins.data();
 }

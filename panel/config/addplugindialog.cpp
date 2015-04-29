@@ -66,6 +66,8 @@ AddPluginDialog::AddPluginDialog(QWidget *parent):
     connect(ui->searchEdit, &QLineEdit::textEdited,
             &mSearchTimer, static_cast<void (QTimer::*)()>(&QTimer::start));
     connect(&mSearchTimer, &QTimer::timeout, this, &AddPluginDialog::filter);
+    connect(ui->pluginList, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(emitPluginSelected()));
+    connect(ui->addButton, SIGNAL(clicked(bool)), this, SLOT(emitPluginSelected()));
 }
 
 AddPluginDialog::~AddPluginDialog()
@@ -102,3 +104,14 @@ void AddPluginDialog::filter()
     if (pluginCount > 0)
         ui->pluginList->setCurrentRow(curr_item < pluginCount ? curr_item : pluginCount - 1);
 }
+
+void AddPluginDialog::emitPluginSelected()
+{
+    QListWidget* pluginList = ui->pluginList;
+    if (pluginList->currentItem() && pluginList->currentItem()->isSelected())
+    {
+        LxQt::PluginInfo plugin = mPlugins.at(pluginList->currentItem()->data(INDEX_ROLE).toInt());
+        emit pluginSelected(plugin);
+    }
+}
+

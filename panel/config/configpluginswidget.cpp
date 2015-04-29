@@ -29,6 +29,7 @@
 #include "ui_configpluginswidget.h"
 #include "addplugindialog.h"
 #include <HtmlDelegate>
+#include "panelplugins.h"
 
 #include <QPushButton>
 
@@ -40,12 +41,19 @@ ConfigPluginsWidget::ConfigPluginsWidget(LxQtPanel *panel, QWidget* parent) :
     ui->setupUi(this);
 
     QScopedPointer<QItemSelectionModel> m{ui->listView_plugins->selectionModel()};
-    ui->listView_plugins->setModel(panel->pluginsModel());
+    PanelPlugins * plugins = mPanel->pluginsModel();
+    ui->listView_plugins->setModel(plugins);
     QScopedPointer<QAbstractItemDelegate> d{ui->listView_plugins->itemDelegate()};
     ui->listView_plugins->setItemDelegate(new LxQt::HtmlDelegate(QSize(32, 32), ui->listView_plugins));
+    connect(ui->listView_plugins, &QListView::activated, plugins, &PanelPlugins::onActivatedIndex);
 
-    connect(ui->pushButton_addPlugin, &QPushButton::clicked,
-            this, &ConfigPluginsWidget::showAddPluginDialog);
+    connect(ui->pushButton_moveUp, &QToolButton::clicked, plugins, &PanelPlugins::onMovePluginUp);
+    connect(ui->pushButton_moveDown, &QToolButton::clicked, plugins, &PanelPlugins::onMovePluginDown);
+
+    connect(ui->pushButton_addPlugin, &QPushButton::clicked, this, &ConfigPluginsWidget::showAddPluginDialog);
+    connect(ui->pushButton_removePlugin, &QToolButton::clicked, plugins, &PanelPlugins::onRemovePlugin);
+
+    connect(ui->pushButton_pluginConfig, &QToolButton::clicked, plugins, &PanelPlugins::onConfigurePlugin);
 }
 
 ConfigPluginsWidget::~ConfigPluginsWidget()
@@ -60,6 +68,10 @@ void ConfigPluginsWidget::reset()
 
 void ConfigPluginsWidget::showAddPluginDialog()
 {
-    static AddPluginDialog *addPluginDialog = new AddPluginDialog(this);
-    addPluginDialog->exec();
+    AddPluginDialog * addPluginDialog = new AddPluginDialog{nullptr};
+    addPluginDialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(addPluginDialog, &AddPluginDialog::pluginSelected, mPanel->pluginsModel(), &PanelPlugins::addPlugin);
+    addPluginDialog->show();
+    addPluginDialog->raise();
+    addPluginDialog->activateWindow();
 }

@@ -1,5 +1,6 @@
 #include "panelplugins.h"
 #include "plugin.h"
+#include "ilxqtpanelplugin.h"
 #include "lxqtpanel.h"
 #include <QPointer>
 #include <XdgIcon>
@@ -87,21 +88,27 @@ void PanelPlugins::addPlugin(const LxQt::PluginInfo &desktopFile)
 {
     QString name = findNewPluginSettingsGroup(desktopFile.id());
     QPointer<Plugin> plugin = loadPlugin(desktopFile, name);
-    if (plugin.isNull())
+    if (!plugin.isNull())
     {
+        beginInsertRows(QModelIndex(), mPlugins.size(), mPlugins.size());
         mPlugins.append({name, plugin});
-        emit pluginAdded(LxQt::PluginData(plugin->desktopFile().id(), plugin, plugin->popupMenu()));
+        endInsertRows();
+        emit pluginAdded(plugin.data());
     }
 }
 
 void PanelPlugins::removePlugin()
 {
     Plugin * p = qobject_cast<Plugin*>(sender());
-    auto  plugin = std::find_if(mPlugins.begin(), mPlugins.end(), [p] (container_t::const_reference obj) { return p == obj.second; });
+    auto plugin = std::find_if(mPlugins.begin(), mPlugins.end(), [p] (container_t::const_reference obj) { return p == obj.second; });
     if (mPlugins.end() != plugin)
     {
+        const int row = plugin - mPlugins.begin();
+        beginRemoveRows(QModelIndex(), row, row);
         mPlugins.erase(plugin);
-        emit pluginRemoved(LxQt::PluginData(p->desktopFile().id(), p, nullptr/*don't want any menu*/));
+        endRemoveRows();
+        mActive = mPlugins.isEmpty() ? QModelIndex() : createIndex(mPlugins.size() > row ? row : row - 1, 0);
+        emit pluginRemoved(plugin->second.data());
         p->deleteLater();
     }
 }
@@ -112,14 +119,24 @@ void PanelPlugins::movePlugin(Plugin const * plugin, QString const & nameAfter)
     auto moved = std::find_if(mPlugins.begin(), mPlugins.end(), [plugin] (container_t::const_reference obj) { return plugin == obj.second.data(); });
     auto new_pos = std::find_if(mPlugins.begin(), mPlugins.end(), [nameAfter] (container_t::const_reference obj) { return nameAfter == obj.first; });
 
-    auto pos = mPlugins.insert(new_pos, *moved);
-    for (auto i = mPlugins.begin(), i_e = mPlugins.end(); i_e != i; ++i)
+    const int from = moved - mPlugins.begin();
+    const int to = new_pos == mPlugins.end() ? mPlugins.size() - 1 : new_pos - mPlugins.begin();
+    int higher, lower;
+    if (to > from)
     {
-        if (pos != i && i->first == pos->first)
-        {
-            mPlugins.erase(i);
-            break;
-        }
+        higher = to;
+        lower = from;
+    } else
+    {
+        higher = from;
+        lower = to;
+    }
+
+    if (higher != lower)
+    {
+        beginMoveRows(QModelIndex(), higher, higher, QModelIndex(), lower);
+        mPlugins.swap(higher, lower);
+        endMoveRows();
     }
 }
 
@@ -180,4 +197,73 @@ QString PanelPlugins::findNewPluginSettingsGroup(const QString &pluginType) cons
             return QStringLiteral("%1%2").arg(pluginType).arg(i);
 }
 
+void PanelPlugins::onActivatedIndex(QModelIndex const & index)
+{
+    mActive = index;
+}
 
+bool PanelPlugins::isActiveIndexValid() const
+{
+    return mActive.isValid() && QModelIndex() == mActive.parent()
+        && 0 == mActive.column() && mPlugins.size() > mActive.row();
+}
+
+void PanelPlugins::onMovePluginUp()
+{
+    if (!isActiveIndexValid())
+        return;
+
+    const int row = mActive.row();
+    if (0 >= row)
+        return; //can't move up
+
+    beginMoveRows(QModelIndex(), row, row, QModelIndex(), row - 1);
+    mPlugins.swap(row - 1, row);
+    endMoveRows();
+    container_t::const_reference moved_plugin = mPlugins[row - 1];
+    container_t::const_reference prev_plugin = mPlugins[row];
+
+    //emit signal for layout only in case both plugins are loaded/displayed
+    if (!moved_plugin.second.isNull() && !prev_plugin.second.isNull())
+        emit pluginMovedUp(moved_plugin.second.data());
+}
+
+void PanelPlugins::onMovePluginDown()
+{
+    if (!isActiveIndexValid())
+        return;
+
+    const int row = mActive.row();
+    if (mPlugins.size() <= row + 1)
+        return; //can't move down
+
+    beginMoveRows(QModelIndex(), row, row, QModelIndex(), row + 2);
+    mPlugins.swap(row, row + 1);
+    endMoveRows();
+    container_t::const_reference moved_plugin = mPlugins[row + 1];
+    container_t::const_reference next_plugin = mPlugins[row];
+
+    //emit signal for layout only in case both plugins are loaded/displayed
+    if (!moved_plugin.second.isNull() && !next_plugin.second.isNull())
+        emit pluginMovedUp(next_plugin.second.data());
+}
+
+void PanelPlugins::onConfigurePlugin()
+{
+    if (!isActiveIndexValid())
+        return;
+
+    Plugin * const plugin = mPlugins[mActive.row()].second.data();
+    if (nullptr != plugin && (ILxQtPanelPlugin::HaveConfigDialog & plugin->iPlugin()->flags()))
+        plugin->showConfigureDialog();
+}
+
+void PanelPlugins::onRemovePlugin()
+{
+    if (!isActiveIndexValid())
+        return;
+
+    Plugin * const plugin = mPlugins[mActive.row()].second.data();
+    if (nullptr != plugin)
+        plugin->requestRemove();
+}

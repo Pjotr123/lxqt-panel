@@ -37,22 +37,35 @@ public:
     void movePlugin(Plugin const * plugin, QString const & nameAfter);
 
 signals:
-    void pluginAdded(LxQt::PluginData const & plugin);
-    void pluginRemoved(LxQt::PluginData const & plugin);
+    void pluginAdded(Plugin * plugin);
+    void pluginRemoved(Plugin * plugin);
+    /*!
+     * Emiting only move-up for simplification of using (and problematic layout/list move)
+     */
+    void pluginMovedUp(Plugin * plugin);
 
 public slots:
     void addPlugin(const LxQt::PluginInfo &desktopFile);
     void removePlugin();
 
+    // slots for configuration dialog
+    void onActivatedIndex(QModelIndex const & index);
+    void onMovePluginUp();
+    void onMovePluginDown();
+    void onConfigurePlugin();
+    void onRemovePlugin();
+
 private:
     void loadPlugins(QString const & namesKey, QStringList const & desktopDirs);
     QPointer<Plugin> loadPlugin(LxQt::PluginInfo const & desktopFile, QString const & settingsGroup);
     QString findNewPluginSettingsGroup(const QString &pluginType) const;
+    bool isActiveIndexValid() const;
 
 private:
     typedef QList<QPair <QString/*name*/, QPointer<Plugin> > > container_t;
     container_t mPlugins;
     LxQtPanel * mPanel;
+    QPersistentModelIndex mActive;
 };
 
 #endif //panel_panelplugins_h
