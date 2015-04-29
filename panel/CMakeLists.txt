@@ -1,7 +1,7 @@
 set(PROJECT lxqt-panel)
 
 set(PRIV_HEADERS
-    panelplugins.h
+    panelpluginsmodel.h
     lxqtpanel.h
     lxqtpanelapplication.h
     lxqtpanellayout.h
@@ -25,7 +25,7 @@ set(PUB_HEADERS
 
 set(SOURCES
     main.cpp
-    panelplugins.cpp
+    panelpluginsmodel.cpp
     lxqtpanel.cpp
     lxqtpanelapplication.cpp
     lxqtpanellayout.cpp

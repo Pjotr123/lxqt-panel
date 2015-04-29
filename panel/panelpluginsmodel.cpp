@@ -1,4 +1,4 @@
-#include "panelplugins.h"
+#include "panelpluginsmodel.h"
 #include "plugin.h"
 #include "ilxqtpanelplugin.h"
 #include "lxqtpanel.h"
@@ -8,46 +8,43 @@
 
 #include <QDebug>
 
-PanelPlugins::PanelPlugins(LxQtPanel * panel
-        , QString const & namesKey
-        , QStringList const & desktopDirs
-        , QObject * parent/* = nullptr*/
-        )
-    : QAbstractListModel{parent}
-    , mPanel{panel}
+PanelPluginsModel::PanelPluginsModel(LxQtPanel * panel,
+                                     QString const & namesKey,
+                                     QStringList const & desktopDirs,
+                                     QObject * parent/* = nullptr*/)
+    : QAbstractListModel{parent},
+    mPanel(panel)
 {
     loadPlugins(namesKey, desktopDirs);
 }
 
-PanelPlugins::~PanelPlugins()
+PanelPluginsModel::~PanelPluginsModel()
 {
     qDeleteAll(plugins());
 }
 
-int PanelPlugins::rowCount(const QModelIndex & parent/* = QModelIndex()*/) const
+int PanelPluginsModel::rowCount(const QModelIndex & parent/* = QModelIndex()*/) const
 {
     return QModelIndex() == parent ? mPlugins.size() : 0;
 }
 
 
-QVariant PanelPlugins::data(const QModelIndex & index, int role/* = Qt::DisplayRole*/) const
+QVariant PanelPluginsModel::data(const QModelIndex & index, int role/* = Qt::DisplayRole*/) const
 {
     Q_ASSERT(QModelIndex() == index.parent()
             && 0 == index.column()
             && mPlugins.size() > index.row()
             );
 
-    container_t::const_reference plugin = mPlugins[index.row()];
+    pluginslist_t::const_reference plugin = mPlugins[index.row()];
     QVariant ret;
     switch (role)
     {
         case Qt::DisplayRole:
             if (plugin.second.isNull())
-                ret = QStringLiteral("<b>unknown</b> (%1)<br/>we weren't able to load this plugin").arg(plugin.first);
+                ret = QStringLiteral("<b>Unknown</b> (%1)").arg(plugin.first);
             else
-                ret = QStringLiteral("<b>%1</b> (%2)<br/>%3").arg(plugin.second->name()
-                        , plugin.first
-                        , plugin.second->desktopFile().value(QStringLiteral("Comment")).toString());
+                ret = QStringLiteral("<b>%1</b> (%2)").arg(plugin.second->name(), plugin.first);
             break;
         case Qt::DecorationRole:
             if (plugin.second.isNull())
@@ -59,12 +56,12 @@ QVariant PanelPlugins::data(const QModelIndex & index, int role/* = Qt::DisplayR
     return ret;
 }
 
-Qt::ItemFlags PanelPlugins::flags(const QModelIndex & index) const
+Qt::ItemFlags PanelPluginsModel::flags(const QModelIndex & index) const
 {
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemNeverHasChildren;
 }
 
-QStringList PanelPlugins::pluginNames() const
+QStringList PanelPluginsModel::pluginNames() const
 {
     QStringList names;
     for (auto const & p : mPlugins)
@@ -72,7 +69,7 @@ QStringList PanelPlugins::pluginNames() const
     return std::move(names);
 }
 
-QList<Plugin *> PanelPlugins::plugins() const
+QList<Plugin *> PanelPluginsModel::plugins() const
 {
     QList<Plugin *> plugins;
     for (auto const & p : mPlugins)
@@ -81,7 +78,7 @@ QList<Plugin *> PanelPlugins::plugins() const
     return std::move(plugins);
 }
 
-void PanelPlugins::addPlugin(const LxQt::PluginInfo &desktopFile)
+void PanelPluginsModel::addPlugin(const LxQt::PluginInfo &desktopFile)
 {
     QString name = findNewPluginSettingsGroup(desktopFile.id());
     QPointer<Plugin> plugin = loadPlugin(desktopFile, name);
@@ -94,7 +91,7 @@ void PanelPlugins::addPlugin(const LxQt::PluginInfo &desktopFile)
     }
 }
 
-void PanelPlugins::removePlugin(container_t::iterator plugin)
+void PanelPluginsModel::removePlugin(pluginslist_t::iterator plugin)
 {
     if (mPlugins.end() != plugin)
     {
@@ -105,27 +102,28 @@ void PanelPlugins::removePlugin(container_t::iterator plugin)
         mPlugins.erase(plugin);
         endRemoveRows();
         mActive = mPlugins.isEmpty() ? QModelIndex() : createIndex(mPlugins.size() > row ? row : row - 1, 0);
-        emit pluginRemoved(p); //p can be nullptr
+        emit pluginRemoved(p); // p can be nullptr
         if (nullptr != p)
             p->deleteLater();
     }
 }
 
-void PanelPlugins::removePlugin()
+void PanelPluginsModel::removePlugin()
 {
     Plugin * p = qobject_cast<Plugin*>(sender());
-    auto plugin = std::find_if(mPlugins.begin(), mPlugins.end(), [p] (container_t::const_reference obj) { return p == obj.second; });
+    auto plugin = std::find_if(mPlugins.begin(), mPlugins.end(),
+                               [p] (pluginslist_t::const_reference obj) { return p == obj.second; });
     removePlugin(std::move(plugin));
 }
 
-void PanelPlugins::movePlugin(Plugin const * plugin, QString const & nameAfter)
+void PanelPluginsModel::movePlugin(Plugin const * plugin, QString const & nameAfter)
 {
     //merge list of plugins (try to preserve original position)
     const int from =
-        std::find_if(mPlugins.begin(), mPlugins.end(), [plugin] (container_t::const_reference obj) { return plugin == obj.second.data(); })
+        std::find_if(mPlugins.begin(), mPlugins.end(), [plugin] (pluginslist_t::const_reference obj) { return plugin == obj.second.data(); })
         - mPlugins.begin();
     const int to =
-        std::find_if(mPlugins.begin(), mPlugins.end(), [nameAfter] (container_t::const_reference obj) { return nameAfter == obj.first; })
+        std::find_if(mPlugins.begin(), mPlugins.end(), [nameAfter] (pluginslist_t::const_reference obj) { return nameAfter == obj.first; })
         - mPlugins.begin();
     const int to_plugins = from < to ? to - 1 : to;
 
@@ -137,7 +135,7 @@ void PanelPlugins::movePlugin(Plugin const * plugin, QString const & nameAfter)
     }
 }
 
-void PanelPlugins::loadPlugins(QString const & namesKey, QStringList const & desktopDirs)
+void PanelPluginsModel::loadPlugins(QString const & namesKey, QStringList const & desktopDirs)
 {
     QStringList plugin_names = mPanel->settings()->value(namesKey).toStringList();
 
@@ -148,7 +146,7 @@ void PanelPlugins::loadPlugins(QString const & namesKey, QStringList const & des
 #endif
     for (auto const & name : plugin_names)
     {
-        container_t::iterator i = mPlugins.insert(mPlugins.end(), {name, nullptr});
+        pluginslist_t::iterator i = mPlugins.insert(mPlugins.end(), {name, nullptr});
         QString type = mPanel->settings()->value(name + "/type").toString();
         if (type.isEmpty())
         {
@@ -171,19 +169,20 @@ void PanelPlugins::loadPlugins(QString const & namesKey, QStringList const & des
     }
 }
 
-QPointer<Plugin> PanelPlugins::loadPlugin(LxQt::PluginInfo const & desktopFile, QString const & settingsGroup)
+QPointer<Plugin> PanelPluginsModel::loadPlugin(LxQt::PluginInfo const & desktopFile, QString const & settingsGroup)
 {
-    std::unique_ptr<Plugin> plugin{new Plugin{desktopFile, mPanel->settings()->fileName(), settingsGroup, mPanel}};
+    std::unique_ptr<Plugin> plugin(new Plugin(desktopFile, mPanel->settings()->fileName(), settingsGroup, mPanel));
     if (plugin->isLoaded())
     {
-        connect(plugin.get(), &Plugin::remove, this, static_cast<void (PanelPlugins::*)()>(&PanelPlugins::removePlugin));
+        connect(plugin.get(), &Plugin::remove,
+                this, static_cast<void (PanelPluginsModel::*)()>(&PanelPluginsModel::removePlugin));
         return plugin.release();
     }
 
     return nullptr;
 }
 
-QString PanelPlugins::findNewPluginSettingsGroup(const QString &pluginType) const
+QString PanelPluginsModel::findNewPluginSettingsGroup(const QString &pluginType) const
 {
     QStringList groups = mPanel->settings()->childGroups();
     groups.sort();
@@ -194,18 +193,18 @@ QString PanelPlugins::findNewPluginSettingsGroup(const QString &pluginType) cons
             return QStringLiteral("%1%2").arg(pluginType).arg(i);
 }
 
-void PanelPlugins::onActivatedIndex(QModelIndex const & index)
+void PanelPluginsModel::onActivatedIndex(QModelIndex const & index)
 {
     mActive = index;
 }
 
-bool PanelPlugins::isActiveIndexValid() const
+bool PanelPluginsModel::isActiveIndexValid() const
 {
     return mActive.isValid() && QModelIndex() == mActive.parent()
         && 0 == mActive.column() && mPlugins.size() > mActive.row();
 }
 
-void PanelPlugins::onMovePluginUp()
+void PanelPluginsModel::onMovePluginUp()
 {
     if (!isActiveIndexValid())
         return;
@@ -217,15 +216,15 @@ void PanelPlugins::onMovePluginUp()
     beginMoveRows(QModelIndex(), row, row, QModelIndex(), row - 1);
     mPlugins.swap(row - 1, row);
     endMoveRows();
-    container_t::const_reference moved_plugin = mPlugins[row - 1];
-    container_t::const_reference prev_plugin = mPlugins[row];
+    pluginslist_t::const_reference moved_plugin = mPlugins[row - 1];
+    pluginslist_t::const_reference prev_plugin = mPlugins[row];
 
     //emit signal for layout only in case both plugins are loaded/displayed
     if (!moved_plugin.second.isNull() && !prev_plugin.second.isNull())
         emit pluginMovedUp(moved_plugin.second.data());
 }
 
-void PanelPlugins::onMovePluginDown()
+void PanelPluginsModel::onMovePluginDown()
 {
     if (!isActiveIndexValid())
         return;
@@ -237,15 +236,15 @@ void PanelPlugins::onMovePluginDown()
     beginMoveRows(QModelIndex(), row, row, QModelIndex(), row + 2);
     mPlugins.swap(row, row + 1);
     endMoveRows();
-    container_t::const_reference moved_plugin = mPlugins[row + 1];
-    container_t::const_reference next_plugin = mPlugins[row];
+    pluginslist_t::const_reference moved_plugin = mPlugins[row + 1];
+    pluginslist_t::const_reference next_plugin = mPlugins[row];
 
     //emit signal for layout only in case both plugins are loaded/displayed
     if (!moved_plugin.second.isNull() && !next_plugin.second.isNull())
         emit pluginMovedUp(next_plugin.second.data());
 }
 
-void PanelPlugins::onConfigurePlugin()
+void PanelPluginsModel::onConfigurePlugin()
 {
     if (!isActiveIndexValid())
         return;
@@ -255,7 +254,7 @@ void PanelPlugins::onConfigurePlugin()
         plugin->showConfigureDialog();
 }
 
-void PanelPlugins::onRemovePlugin()
+void PanelPluginsModel::onRemovePlugin()
 {
     if (!isActiveIndexValid())
         return;

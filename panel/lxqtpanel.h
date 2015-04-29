@@ -47,7 +47,7 @@ class PluginInfo;
 }
 class LxQtPanelLayout;
 class ConfigPanelDialog;
-class PanelPlugins;
+class PanelPluginsModel;
 
 /*! \brief The LxQtPanel class provides a single lxqt-panel.
  */
@@ -59,6 +59,7 @@ class LXQT_PANEL_API LxQtPanel : public QFrame, public ILxQtPanel
 
     // for configuration dialog
     friend class ConfigPanelWidget;
+    friend class ConfigPluginsWidget;
 
 public:
     enum Alignment {
@@ -103,8 +104,6 @@ public:
     bool hidable() const { return mHidable; }
 
     LxQt::Settings *settings() const { return mSettings; }
-
-    PanelPlugins * pluginsModel();
 
 public slots:
     void show();
@@ -151,7 +150,7 @@ private:
     LxQt::Settings *mSettings;
     QFrame *LxQtPanelWidget;
     QString mConfigGroup;
-    QScopedPointer<PanelPlugins> mPlugins;
+    QScopedPointer<PanelPluginsModel> mPlugins;
 
     int findAvailableScreen(LxQtPanel::Position position);
     void updateWmStrut();

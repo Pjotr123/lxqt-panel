@@ -34,7 +34,7 @@
 #include "config/configpaneldialog.h"
 #include "popupmenu.h"
 #include "plugin.h"
-#include "panelplugins.h"
+#include "panelpluginsmodel.h"
 #include <LXQt/Settings>
 #include <LXQt/PluginInfo>
 
@@ -319,19 +319,17 @@ QStringList pluginDesktopDirs()
  ************************************************/
 void LxQtPanel::loadPlugins()
 {
-    QString names_key{mConfigGroup};
+    QString names_key(mConfigGroup);
     names_key += '/';
     names_key += QLatin1String(CFG_KEY_PLUGINS);
-    mPlugins.reset(new PanelPlugins{this, names_key, pluginDesktopDirs()});
+    mPlugins.reset(new PanelPluginsModel(this, names_key, pluginDesktopDirs()));
 
-    connect(mPlugins.data(), &PanelPlugins::pluginAdded, [this] (Plugin * p) { pluginAdded(p, true); });
-    connect(mPlugins.data(), &PanelPlugins::pluginRemoved, [this] { saveSettings(); });
-    connect(mPlugins.data(), &PanelPlugins::pluginMovedUp, this, &LxQtPanel::pluginMovedUp);
+    connect(mPlugins.data(), &PanelPluginsModel::pluginAdded, [this] (Plugin * p) { pluginAdded(p, true); });
+    connect(mPlugins.data(), &PanelPluginsModel::pluginRemoved, [this] { saveSettings(); });
+    connect(mPlugins.data(), &PanelPluginsModel::pluginMovedUp, this, &LxQtPanel::pluginMovedUp);
 
     for (auto const & plugin : mPlugins->plugins())
-    {
         pluginAdded(plugin, false);
-    }
 }
 
 /************************************************
@@ -341,14 +339,15 @@ void LxQtPanel::pluginAdded(Plugin * plugin, bool saveSetting)
 {
     connect(plugin, &Plugin::startMove, mLayout, &LxQtPanelLayout::startMovePlugin);
     connect(this, &LxQtPanel::realigned, plugin, &Plugin::realign);
+
     const int prev_count = mLayout->count();
     mLayout->addWidget(plugin);
+
     //check actual position
     const int pos = mLayout->indexOf(plugin);
     if (prev_count > pos)
-    {
         mLayout->moveItem(prev_count, pos, false);
-    }
+
     if (saveSetting)
         saveSettings(true);
 }
@@ -1124,9 +1123,4 @@ void LxQtPanel::setHidable(bool hidable, bool save)
         saveSettings(true);
 
     realign();
-}
-
-PanelPlugins * LxQtPanel::pluginsModel()
-{
-    return mPlugins.data();
 }
