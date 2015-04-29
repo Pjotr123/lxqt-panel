@@ -80,6 +80,7 @@ public:
     // ILxQtPanel .........................
     ILxQtPanel::Position position() const { return mPosition; }
     QRect globalGometry() const;
+    Plugin *findPlugin(const ILxQtPanelPlugin *iPlugin) const;
     QRect calculatePopupWindowPos(const ILxQtPanelPlugin *plugin, const QSize &windowSize) const;
 
     // For QSS properties ..................
@@ -156,8 +157,6 @@ private:
     void updateWmStrut();
 
     void loadPlugins();
-
-    QString findNewPluginSettingsGroup(const QString &pluginType) const;
 
     int mPanelSize;
     int mIconSize;

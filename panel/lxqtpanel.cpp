@@ -966,13 +966,21 @@ void LxQtPanel::showPopupMenu(Plugin *plugin)
     qDeleteAll(pluginsMenus);
 }
 
+Plugin* LxQtPanel::findPlugin(const ILxQtPanelPlugin* iPlugin) const
+{
+    Plugin *plugin = nullptr;
+    for (Plugin *plug : mPlugins->plugins())
+        if (plug->iPlugin() == iPlugin)
+            plugin = plug;
+    return plugin;
+}
 
 /************************************************
 
  ************************************************/
 QRect LxQtPanel::calculatePopupWindowPos(const ILxQtPanelPlugin *plugin, const QSize &windowSize) const
 {
-    Plugin const * panel_plugin = dynamic_cast<Plugin const *>(plugin);
+    Plugin *panel_plugin = findPlugin(plugin);
     if (nullptr == panel_plugin)
         return QRect();
 
