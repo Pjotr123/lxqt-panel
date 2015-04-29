@@ -52,6 +52,7 @@ public slots:
 
 private slots:
     void showAddPluginDialog();
+    void resetButtons();
 
 private:
     Ui::ConfigPluginsWidget *ui;
