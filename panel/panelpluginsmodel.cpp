@@ -1,8 +1,8 @@
 /* BEGIN_COMMON_COPYRIGHT_HEADER
  * (c)LGPL2+
  *
- * LXDE-Qt - a lightweight, Qt based, desktop toolset
- * http://razor-qt.org
+ * LXQt - a lightweight, Qt based, desktop toolset
+ * http://lxqt.org
  *
  * Copyright: 2015 LXQt team
  *
@@ -38,9 +38,10 @@ PanelPluginsModel::PanelPluginsModel(LxQtPanel * panel,
                                      QStringList const & desktopDirs,
                                      QObject * parent/* = nullptr*/)
     : QAbstractListModel{parent},
+    mNamesKey(namesKey),
     mPanel(panel)
 {
-    loadPlugins(namesKey, desktopDirs);
+    loadPlugins(desktopDirs);
 }
 
 PanelPluginsModel::~PanelPluginsModel()
@@ -112,6 +113,7 @@ void PanelPluginsModel::addPlugin(const LxQt::PluginInfo &desktopFile)
         beginInsertRows(QModelIndex(), mPlugins.size(), mPlugins.size());
         mPlugins.append({name, plugin});
         endInsertRows();
+        mPanel->settings()->setValue(mNamesKey, pluginNames());
         emit pluginAdded(plugin.data());
     }
 }
@@ -128,6 +130,7 @@ void PanelPluginsModel::removePlugin(pluginslist_t::iterator plugin)
         endRemoveRows();
         mActive = mPlugins.isEmpty() ? QModelIndex() : createIndex(mPlugins.size() > row ? row : row - 1, 0);
         emit pluginRemoved(p); // p can be nullptr
+        mPanel->settings()->setValue(mNamesKey, pluginNames());
         if (nullptr != p)
             p->deleteLater();
     }
@@ -157,12 +160,13 @@ void PanelPluginsModel::movePlugin(Plugin const * plugin, QString const & nameAf
         beginMoveRows(QModelIndex(), from, from, QModelIndex(), to);
         mPlugins.move(from, to_plugins);
         endMoveRows();
+        mPanel->settings()->setValue(mNamesKey, pluginNames());
     }
 }
 
-void PanelPluginsModel::loadPlugins(QString const & namesKey, QStringList const & desktopDirs)
+void PanelPluginsModel::loadPlugins(QStringList const & desktopDirs)
 {
-    QStringList plugin_names = mPanel->settings()->value(namesKey).toStringList();
+    QStringList plugin_names = mPanel->settings()->value(mNamesKey).toStringList();
 
 #ifdef DEBUG_PLUGIN_LOADTIME
     QElapsedTimer timer;
@@ -199,6 +203,7 @@ QPointer<Plugin> PanelPluginsModel::loadPlugin(LxQt::PluginInfo const & desktopF
     std::unique_ptr<Plugin> plugin(new Plugin(desktopFile, mPanel->settings()->fileName(), settingsGroup, mPanel));
     if (plugin->isLoaded())
     {
+        connect(mPanel, &LxQtPanel::realigned, plugin.get(), &Plugin::realign);
         connect(plugin.get(), &Plugin::remove,
                 this, static_cast<void (PanelPluginsModel::*)()>(&PanelPluginsModel::removePlugin));
         return plugin.release();

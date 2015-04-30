@@ -45,10 +45,13 @@ ConfigPluginsWidget::ConfigPluginsWidget(LxQtPanel *panel, QWidget* parent) :
 
     PanelPluginsModel * plugins = mPanel->mPlugins.data();
     {
-        QScopedPointer<QAbstractItemDelegate> d(ui->listView_plugins->itemDelegate());
+        QScopedPointer<QItemSelectionModel> m(ui->listView_plugins->selectionModel());
+        ui->listView_plugins->setModel(plugins);
     }
-    ui->listView_plugins->setModel(plugins);
-    ui->listView_plugins->setItemDelegate(new LxQt::HtmlDelegate(QSize(16, 16), ui->listView_plugins));
+    {
+        QScopedPointer<QAbstractItemDelegate> d(ui->listView_plugins->itemDelegate());
+        ui->listView_plugins->setItemDelegate(new LxQt::HtmlDelegate(QSize(16, 16), ui->listView_plugins));
+    }
 
     resetButtons();
 

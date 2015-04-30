@@ -80,6 +80,8 @@ signals:
 public slots:
     void startMovePlugin();
     void finishMovePlugin();
+    void moveUpPlugin(Plugin * plugin);
+    void addPlugin(Plugin * plugin);
 
 private:
     mutable QSize mMinPluginSize;
