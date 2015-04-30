@@ -91,7 +91,7 @@
         <location filename="../config/configpaneldialog.cpp" line="80"/>
         <location filename="../config/configpaneldialog.cpp" line="86"/>
         <source>Configure Panel</source>
-        <translation type="unfinished"></translation>
+        <translation type="finished">Paneel instellen</translation>
     </message>
 </context>
 <context>
@@ -99,23 +99,23 @@
     <message>
         <location filename="../config/configpaneldialog.ui" line="20"/>
         <source>Configure panel</source>
-        <translation type="unfinished"></translation>
+        <translation type="finished">Paneel instellen</translation>
     </message>
     <message>
         <location filename="../config/configpaneldialog.ui" line="32"/>
         <source>Size</source>
-        <translation type="unfinished"></translation>
+        <translation type="finished">Grootte</translation>
     </message>
     <message>
         <location filename="../config/configpaneldialog.ui" line="41"/>
         <source>Size:</source>
-        <translation type="unfinished">Grootte:</translation>
+        <translation type="finished">Grootte:</translation>
     </message>
     <message>
         <location filename="../config/configpaneldialog.ui" line="48"/>
         <location filename="../config/configpaneldialog.ui" line="82"/>
         <source> px</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">px</translation>
     </message>
     <message>
         <location filename="../config/configpaneldialog.ui" line="58"/>
