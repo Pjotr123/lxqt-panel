@@ -80,12 +80,15 @@ void ConfigPluginsWidget::reset()
 
 void ConfigPluginsWidget::showAddPluginDialog()
 {
-    static AddPluginDialog addPluginDialog;
-    connect(&addPluginDialog, &AddPluginDialog::pluginSelected,
-            mPanel->mPlugins.data(), &PanelPluginsModel::addPlugin);
-    addPluginDialog.show();
-    addPluginDialog.raise();
-    addPluginDialog.activateWindow();
+    if (mAddPluginDialog.isNull())
+    {
+        mAddPluginDialog.reset(new AddPluginDialog);
+        connect(mAddPluginDialog.data(), &AddPluginDialog::pluginSelected,
+                mPanel->mPlugins.data(), &PanelPluginsModel::addPlugin);
+    }
+    mAddPluginDialog->show();
+    mAddPluginDialog->raise();
+    mAddPluginDialog->activateWindow();
 }
 
 void ConfigPluginsWidget::resetButtons()
